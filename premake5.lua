@@ -1179,6 +1179,16 @@ project "tta"
   }
 end
 
+if option ("plugin-medialib") then
+project "medialib"
+  files {
+    "plugins/medialib/medialib.c"
+  }
+  pkgconfig ("jansson")
+  buildoptions {"-fblocks"}
+  links {"dispatch", "BlocksRuntime"}
+end
+
 project "translations"
   kind "Utility"
   files {
