@@ -1182,7 +1182,7 @@ end
 if option ("plugin-medialib") then
 project "medialib"
   files {
-    "plugins/medialib/medialib.c"
+    "plugins/medialib/*.c"
   }
   pkgconfig ("jansson")
   buildoptions {"-fblocks"}
