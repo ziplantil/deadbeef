@@ -66,7 +66,6 @@ typedef struct {
     int64_t totalsamples;
     int flac_critical_error;
     int init_stop_decoding;
-    int is_ogg_streaming;
     int set_bitrate;
     DB_FILE *file;
     DB_playItem_t *it;
@@ -547,7 +546,6 @@ cflac_init (DB_fileinfo_t *_info, DB_playItem_t *it) {
     }
     deadbeef->pl_unlock ();
 
-    info->is_ogg_streaming = isogg && is_streaming;
     info->buffersize = 100000;
     info->buffer = malloc (info->buffersize);
     info->remaining = 0;
