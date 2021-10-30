@@ -1151,6 +1151,10 @@ m3u_error:
         }
 
         if (!dec) {
+            trace ("decoder %s not available\n", dec->plugin.id);
+            continue;
+        }
+        if (!dec) {
             trace ("no decoder in playitem!\n");
 
             if (!startpaused) {
