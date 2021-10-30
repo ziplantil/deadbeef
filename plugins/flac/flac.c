@@ -48,8 +48,8 @@
 static ddb_decoder2_t plugin;
 static DB_functions_t *deadbeef;
 
-#define trace(...) { fprintf(stderr, __VA_ARGS__); }
-//#define trace(fmt,...)
+//#define trace(...) { fprintf(stderr, __VA_ARGS__); }
+#define trace(fmt,...)
 
 #define min(x,y) ((x)<(y)?(x):(y))
 #define max(x,y) ((x)>(y)?(x):(y))
@@ -66,7 +66,6 @@ typedef struct {
     int64_t totalsamples;
     int flac_critical_error;
     int init_stop_decoding;
-    int is_ogg;
     int set_bitrate;
     DB_FILE *file;
     DB_playItem_t *it;
@@ -320,7 +319,7 @@ cflac_add_metadata (DB_playItem_t *it, const char *s, int length) {
 }
 
 static void
-cflac_metadata_vorbiscomment_read(const FLAC__StreamMetadata *metadata, DB_playItem_t *it) {
+cflac_metadata_vorbiscomment_read (const FLAC__StreamMetadata *metadata, DB_playItem_t *it) {
     const FLAC__StreamMetadata_VorbisComment *vc = &metadata->data.vorbis_comment;
     for (int i = 0; i < vc->num_comments; i++) {
         const FLAC__StreamMetadata_VorbisComment_Entry *c = &vc->comments[i];
@@ -447,6 +446,7 @@ cflac_init (DB_fileinfo_t *_info, DB_playItem_t *it) {
             return -1;
         }
     }
+    int is_streaming = info->file->vfs->is_streaming ();
 
     deadbeef->pl_lock();
     const char *uri = deadbeef->pl_find_meta(it, ":URI");
@@ -484,7 +484,6 @@ cflac_init (DB_fileinfo_t *_info, DB_playItem_t *it) {
 
     FLAC__StreamDecoderInitStatus status;
     info->it = it;
-    info->is_ogg = isogg;
     info->decoder = FLAC__stream_decoder_new ();
     if (!info->decoder) {
         trace ("FLAC__stream_decoder_new failed\n");
@@ -526,6 +525,10 @@ cflac_init (DB_fileinfo_t *_info, DB_playItem_t *it) {
             if (1 == sscanf (channelmask, "0x%X", &cm)) {
                 _info->fmt.channelmask = cm;
             }
+        }
+        // oggflac streams should not show up as "content"
+        if (isogg && is_streaming) {
+            deadbeef->pl_replace_meta (it, "!FILETYPE", "OggFLAC");
         }
     }
     deadbeef->pl_unlock ();
@@ -905,7 +908,6 @@ cflac_insert (ddb_playlist_t *plt, DB_playItem_t *after, const char *fname) {
         isogg = 1;
     }
     info.init_stop_decoding = 0;
-    info.is_ogg = isogg;
 
     // open decoder for metadata reading
     FLAC__StreamDecoderInitStatus status;
@@ -974,7 +976,7 @@ cflac_insert (ddb_playlist_t *plt, DB_playItem_t *after, const char *fname) {
     deadbeef->fclose (info.file);
     info.file = NULL;
 
-    if (!info.got_vorbis_comments) {
+    if (!info.got_vorbis_comments && !is_streaming) {
         cflac_read_metadata (it);
     }
 
