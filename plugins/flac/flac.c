@@ -66,6 +66,7 @@ typedef struct {
     int64_t totalsamples;
     int flac_critical_error;
     int init_stop_decoding;
+    int is_ogg_streaming;
     int set_bitrate;
     DB_FILE *file;
     DB_playItem_t *it;
@@ -343,6 +344,14 @@ fix_bps (int bps) {
     return bps - mod + (mod ? 8 : 0);
 }
 
+static void send_event(DB_playItem_t *it, const int event_enum)
+{
+    ddb_event_track_t *event = (ddb_event_track_t *)deadbeef->event_alloc(event_enum);
+    if ((event->track = it))
+        deadbeef->pl_item_ref(event->track);
+    deadbeef->event_send((ddb_event_t *)event, 0, 0);
+}
+
 static void
 cflac_metadata_callback(const FLAC__StreamDecoder *decoder, const FLAC__StreamMetadata *metadata, void *client_data) {
     DB_fileinfo_t *_info = (DB_fileinfo_t *)client_data;
@@ -363,6 +372,8 @@ cflac_metadata_callback(const FLAC__StreamDecoder *decoder, const FLAC__StreamMe
             deadbeef->plt_modified (plt);
             deadbeef->plt_unref (plt);
         }
+        send_event (info->it, DB_EV_SONGSTARTED);
+        send_event (info->it, DB_EV_TRACKINFOCHANGED);
         deadbeef->sendmessage (DB_EV_PLAYLISTCHANGED, 0, DDB_PLAYLIST_CHANGE_CONTENT, 0);
     }
 }
@@ -492,6 +503,9 @@ cflac_init (DB_fileinfo_t *_info, DB_playItem_t *it) {
     FLAC__stream_decoder_set_md5_checking (info->decoder, 0);
     if (isogg) {
         FLAC__stream_decoder_set_metadata_respond (info->decoder, FLAC__METADATA_TYPE_VORBIS_COMMENT);
+        if (is_streaming) {
+            FLAC__stream_decoder_set_ogg_allow_chaining (info->decoder, true);
+        }
         status = FLAC__stream_decoder_init_ogg_stream (info->decoder, flac_read_cb, flac_seek_cb, flac_tell_cb, flac_length_cb, flac_eof_cb, cflac_write_callback, cflac_metadata_callback, cflac_error_callback, info);
     }
     else {
@@ -533,6 +547,7 @@ cflac_init (DB_fileinfo_t *_info, DB_playItem_t *it) {
     }
     deadbeef->pl_unlock ();
 
+    info->is_ogg_streaming = isogg && is_streaming;
     info->buffersize = 100000;
     info->buffer = malloc (info->buffersize);
     info->remaining = 0;
